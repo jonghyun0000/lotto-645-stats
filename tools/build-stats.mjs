@@ -416,6 +416,21 @@ function prizes() {
   };
 }
 
+// ---------- 기대 회수율 ----------
+// 확률은 어떤 조합이든 같으므로 회수율을 바꾸는 것은 수령액 배수뿐이다.
+// 다만 배수는 당첨자끼리 나눠 갖는 1~3등에만 붙는다. 4등 5만원과 5등 5천원은
+// 규정상 고정액이라 몇 명이 맞히든 그대로다.
+function returns(prize, mult) {
+  const ways = { 1: 1, 2: 6, 3: 228, 4: C(6, 4) * C(39, 2), 5: C(6, 3) * C(39, 3) };
+  let base = 0, boost = 0;
+  for (const r of [1, 2, 3, 4, 5]) {
+    const p = ways[r] / TOTAL;
+    base += p * prize[r];
+    boost += p * prize[r] * (r <= 3 ? mult : 1);   // 고정액 등수에는 배수 없음
+  }
+  return { base: +(base / 10).toFixed(1), boost: +(boost / 10).toFixed(1) };   // 1,000원 대비 %
+}
+
 // ---------- 실행 ----------
 console.log(`데이터 1~${lastNo}회 (판매액 보유 ${usable.length}회차)\n`);
 const m1 = popularity(1, 'r1');
@@ -443,7 +458,10 @@ console.log(`    워크포워드   t ${m9.wfT} vs 32~45 ${m9.wfBandT} · ${m9.wf
 console.log(`    완전분리 최대 ${m9.maxDisjoint}게임 · 5등이상 ` + [1,3,5,7,10].map(k=>k+'게임 '+(m9.reach[k]*100).toFixed(3)+'%').join('  '));
 console.log('m3 ', JSON.stringify({ ...m3, ...fft }));
 console.log('기각', JSON.stringify(rej));
+const ret = returns(prize, m9.mult);
 console.log('상금', JSON.stringify(prize));
+console.log('회수율  ' + ret.base + '%  →  배수 적용 ' + ret.boost + '%   (1,000원당 ' +
+  Math.round(1000 - ret.base * 10) + '원 손실 → ' + Math.round(1000 - ret.boost * 10) + '원 손실)');
 
 // ---------- P 조립 ----------
 // m8은 C(45,6) 전수 계산에서 나오는 상수라 회차와 무관하다. 기존 값을 그대로 옮긴다.
@@ -456,7 +474,7 @@ const P = {
   m5: { single: 235 / TOTAL, gm: m5.gm, overall: m5.overall, table: m5.table,
         p: m5.p, t: m5.t, tHalf1: m5.tHalf1, tHalf2: m5.tHalf2, n: m5.n },
   m8: oldP.m8,
-  m9: m9,
+  m9: { ...m9, ret: ret.base, retBoost: ret.boost },
   rej,
   prize,
 };
