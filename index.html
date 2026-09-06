@@ -385,6 +385,20 @@ function weightedDraw(pool, wf, k){
 const fullPool = Array.from({length:45},(_,i)=>i+1);
 const uniform = k => weightedDraw(fullPool, ()=>1, k);
 
+// 45÷6=7이라 8게임부터는 완전분리가 불가능하다. 그 구간에서는 기존 게임들과의
+// 최대 겹침이 가장 작은 티켓을 찾아 상한에 최대한 붙인다.
+// target은 그 풀에서 이론상 도달 가능한 최소 겹침(비둘기집 하한)으로, 도달하면 즉시 채택한다.
+function minOverlapTicket(pool, existing, target, tries){
+  let best=null, bestOv=Infinity;
+  for(let i=0;i<tries;i++){
+    const c=weightedDraw(pool,()=>1,6);
+    let ov=0;
+    for(const x of existing){ const o=c.filter(n=>x.indexOf(n)>=0).length; if(o>ov) ov=o; }
+    if(ov<bestOv){ bestOv=ov; best=c; if(bestOv<=target) break; }
+  }
+  return best.sort((a,b)=>a-b);
+}
+
 const EXP2 = P.m2.exp, SD2 = P.m2.sd;
 const zOf = n => (counts[n-1]-EXP2)/SD2;
 const pairLift = (a,b) => pair[a-1][b-1] / (N*15/990);
@@ -606,14 +620,8 @@ const MODELS = {
       for(let i=0;i<k;i++){
         const sl=seq.slice(i*6,(i+1)*6);
         if(sl.length===6){ out.push(sl.sort((a,b)=>a-b)); continue; }
-        let bestT=null,bestOv=99,guard=0;
-        while(guard++<3000){
-          const c=uniform(6);
-          const ov=Math.max(...out.map(x=>c.filter(n=>x.indexOf(n)>=0).length));
-          if(ov<bestOv){bestOv=ov;bestT=c;}
-          if(bestOv<=1) break;
-        }
-        out.push(bestT.sort((a,b)=>a-b));
+        // 45개를 다 쓰는 풀이라 남는 번호가 있어 겹침 1까지 내려갈 수 있다.
+        out.push(minOverlapTicket(fullPool, out, 1, 3000));
       }
       return out;
     },
@@ -680,17 +688,19 @@ MODELS.m9 = {
   assume:`확률을 바꿀 수 있다고 주장하지 않습니다. ${NP}회 전체 검정에서 살아남은 두 효과 — 겹치지 않는 배치와 비인기 번호 — 만 결합합니다.`,
   logic:`이 프로젝트의 모든 검정에서 살아남은 결론은 두 가지뿐입니다.
     첫째, 게임끼리 번호가 겹치지 않으면 "적어도 하나 당첨" 확률이 올라갑니다(5게임 기준 +5.2%, 8,145,060개 조합 전수 확인).
+    다만 45÷6=7이라 완전분리는 ${P.m8.maxDisjoint}게임까지만 가능하고, 그 위에서는 겹침을 최소화하는 것이 최선입니다.
     둘째, 사람들이 과도하게 선택하는 번호(1~12, 끝자리 7)를 피하면 당첨 시 나눠 갖는 인원이 줄어
     수령액이 늘어납니다(3등 기준 x1.088, ${NP}회 회귀 p=${P.m5.p}, 전후반 재현, 미래 예측력 검증).
     이 모델은 인기 번호를 뺀 30개 풀을 겹치지 않게 배치해 두 효과를 동시에 적용합니다.
     6게임 이상에서는 남은 인기 번호를 소수의 "수거 티켓"에 몰아넣는데, 수령액 배수가 볼록 함수라
     고르게 나누는 것보다 몰아넣는 쪽이 총 기대수령액이 높기 때문입니다.`,
-  algo:'1~12와 끝자리 7을 배제한 30개 풀을 무작위로 섞어 겹침 없이 배치. 6게임 이상은 배제 번호를 수거 티켓 2장에 집중',
+  algo:'1~12와 끝자리 7을 배제한 30개 풀을 무작위로 섞어 겹침 없이 배치. 6~7게임은 배제 번호를 수거 티켓 2장에 집중. 8게임 이상은 완전분리가 불가능해 겹침이 최소인 티켓을 탐색해 채움',
   evidence:[
     ['12 이하 선택 편향','t = +9.1','ok','유의'],
     ['끝자리 7 선호','t = +3.8','ok','유의'],
     ['미래 예측력 (OOS 5분위)','완전 단조','ok','검증'],
     ['5게임 5등 이상','11.868%','ok','+5.2%'],
+    ['완전분리 가능 최대 게임수',`${P.m8.maxDisjoint}게임`,'warn','45÷6'],
     ['3등 수령액 배수','x1.088','ok','상한'],
     ['1등 예상 동시당첨','15.1 → 13.6명','ok','x1.11'],
     ['1등 당첨 확률','1/8,145,060','warn','불변']
@@ -711,16 +721,22 @@ MODELS.m9 = {
       out.push(s.slice(0,6).sort((a,b)=>a-b));
       if(k>6) out.push(s.slice(6,12).sort((a,b)=>a-b));
     }
-    while(out.length<k){
-      c=sh(CLEAN);
-      for(let i=0;i<5 && out.length<k;i++) out.push(c.slice(i*6,i*6+6).sort((a,b)=>a-b));
-    }
+    // 8게임 이상. CLEAN을 그냥 다시 섞어 나누면 앞의 5장과 최대 5개까지 겹친다.
+    // 수령액 이점을 지키려 풀은 CLEAN으로 유지하되, 겹침이 최소인 티켓을 골라 채운다.
+    // CLEAN 30개가 이미 5장으로 완전분할돼 있어 6개를 5개 그룹에 넣는 이상
+    // 비둘기집 원리로 겹침 2가 하한이다.
+    while(out.length<k) out.push(minOverlapTicket(CLEAN, out, 2, 3000));
     return out.slice(0,k);
   },
   summary(k){
-    const d=P.m8.disjoint[String(k)];
-    const ap = k>=8 ? ' (근사)' : '';
-    return `5등 이상 ${(d*100).toFixed(3)}%${ap} · 3등 당첨금 x1.088 · ${NP}회 검증 완료`;
+    const d=P.m8.disjoint[String(k)], r=P.m8.random[String(k)];
+    if(k<=P.m8.maxDisjoint)
+      return `5등 이상 ${(d*100).toFixed(3)}% · 완전분리 달성 · 3등 당첨금 x1.088 · ${NP}회 검증 완료`;
+    // 45÷6=7이라 8게임부터는 완전분리가 물리적으로 불가능하다.
+    // 도달할 수 없는 상한을 달성치처럼 적는 대신, 겹침 최소화 배치가 실제로
+    // 놓이는 구간(무작위 배치 ~ 완전분리 상한)을 그대로 보여준다.
+    const lo = r ? `${(r*100).toFixed(3)}~` : '';
+    return `5등 이상 ${lo}${(d*100).toFixed(3)}% · ${k}게임은 완전분리 불가(45÷6=7)라 겹침 최소화 배치 · 3등 당첨금 x1.088`;
   },
   meta(g){ return g.some(n=>n<=12||n%10===7) ? '수거 티켓' : '클린 x1.088'; }
 };
