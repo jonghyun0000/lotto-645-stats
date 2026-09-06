@@ -213,6 +213,69 @@
   .evi-row .verdict{flex:none}
   .sheet-close{flex:none;margin:8px 22px calc(16px + env(safe-area-inset-bottom));height:50px;
     border:none;border-radius:14px;background:var(--inner);color:var(--sub);font-size:14px;font-weight:700}
+
+  /* ---- 홈 화면 추가 안내 ---- */
+  .ig-hero{display:flex;justify-content:center;margin:2px 0 16px}
+  /* 아이콘이 홈 화면에 놓이는 순간. prefers-reduced-motion이면 위 전역 규칙이 끈다 */
+  .ball-pop{transform-box:fill-box;transform-origin:center;
+    animation:pop .5s cubic-bezier(.34,1.56,.64,1) .15s both}
+  @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+  .ig-lead{font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:16px}
+  .ig-done{text-align:center;padding:8px 0 4px}
+  .ig-done .mark{width:56px;height:56px;border-radius:50%;background:rgba(18,183,106,.1);
+    color:var(--ok);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+  .ig-done h3{font-size:17px;font-weight:800;margin-bottom:6px}
+  .ig-done p{font-size:13px;color:var(--dim);line-height:1.7}
+
+  .ig-now{margin-bottom:14px}
+  .ig-now .hint{font-size:11.5px;color:var(--dim);text-align:center;margin-top:8px;line-height:1.6}
+  .ig-msg{font-size:11.5px;color:var(--warn);text-align:center;margin-top:6px}
+
+  .ig-url{display:flex;align-items:center;gap:8px;background:var(--inner);border-radius:14px;
+    padding:8px 8px 8px 14px;margin-bottom:14px}
+  .ig-url code{flex:1;min-width:0;font-family:var(--num);font-size:12px;color:var(--sub);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ig-url button{flex:none;border:none;background:var(--txt);color:#fff;border-radius:10px;
+    padding:9px 13px;font-size:12px;font-weight:700}
+
+  .ig-warn{display:flex;gap:10px;background:rgba(247,144,9,.1);border-radius:14px;
+    padding:13px 15px;margin-bottom:16px}
+  .ig-warn svg{flex:none;margin-top:1px;color:var(--warn)}
+  .ig-warn .b{display:block;font-weight:700;margin-bottom:3px;color:#8A5300}
+  .ig-warn p{font-size:12px;line-height:1.65;color:#8A5300}
+
+  .ig-tabs{display:flex;gap:4px;background:var(--inner);border-radius:14px;padding:4px;margin-bottom:12px}
+  .ig-tabs button{flex:1;border:none;background:transparent;border-radius:10px;padding:10px 0;
+    font-size:13px;font-weight:700;color:var(--dim);transition:.13s}
+  .ig-tabs button[aria-selected="true"]{background:var(--card);color:var(--txt);
+    box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  .ig-card{background:var(--inner);border-radius:14px;margin-bottom:8px;overflow:hidden}
+  .ig-card summary{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;
+    list-style:none;user-select:none}
+  .ig-card summary::-webkit-details-marker{display:none}
+  .ig-card .bdg{flex:none;font-family:var(--num);font-size:9.5px;font-weight:700;padding:3px 8px;
+    border-radius:20px;background:var(--blue-bg);color:var(--blue-d)}
+  .ig-card .ttl{flex:1;min-width:0}
+  .ig-card .ttl b{display:block;font-size:13.5px;font-weight:700}
+  .ig-card .ttl span{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+  .ig-card .chev{flex:none;color:var(--dim);transition:transform .18s}
+  .ig-card[open] .chev{transform:rotate(180deg)}
+  .ig-steps{list-style:none;padding:2px 14px 14px;margin:0}
+  .ig-steps li{position:relative;padding-left:30px;padding-bottom:13px}
+  .ig-steps li:last-child{padding-bottom:2px}
+  .ig-steps .n{position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;
+    background:var(--blue);color:#fff;font-family:var(--num);font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center}
+  .ig-steps li::after{content:'';position:absolute;left:10px;top:25px;bottom:3px;width:1px;background:var(--line)}
+  .ig-steps li:last-child::after{display:none}
+  .ig-steps .t{font-size:13px;line-height:1.6;color:var(--txt)}
+  .ig-steps .h{font-size:11.5px;line-height:1.6;color:var(--dim);margin-top:3px}
+  .ig-tip{background:var(--card);border-radius:12px;margin:0 14px 14px;padding:11px 13px;
+    font-size:11.5px;line-height:1.7;color:var(--sub)}
+  .ig-foot{text-align:center;font-size:11.5px;color:var(--dim);line-height:1.8;margin-top:18px}
+  .foot-link{background:none;border:none;color:var(--dim);font-size:10.5px;
+    text-decoration:underline;text-underline-offset:3px;padding:6px 2px 0}
 </style>
 </head>
 <body>
@@ -223,9 +286,9 @@
 
   <div class="wrap">
     <div class="install-tip" id="installTip">
-      <span class="txt" id="installTxt"></span>
-      <button class="act" id="installBtn">설치</button>
-      <button class="x" id="installX" aria-label="닫기">&times;</button>
+      <span class="txt" id="installTxt">홈 화면에 두면 한 번에 열려요</span>
+      <button class="act" id="installBtn">추가 방법</button>
+      <button class="x" id="installX" aria-label="안내 닫기">&times;</button>
     </div>
     <div class="card">
       <div class="round-line"><span class="no">제 <b id="latestNo">-</b>회 당첨 결과</span></div>
@@ -281,6 +344,7 @@
     본 서비스는 통계 참고용 도구이며 복권 판매·구매 기능이 없고 당첨을 보장하지 않습니다.<br>
     어떤 방식도 1등 확률 1/8,145,060을 바꾸지 못합니다. 복권 구매는 19세 이상만 가능합니다.
     <span id="staleNote"></span>
+    <br><button class="foot-link" id="footInstall">홈 화면에 추가하는 방법</button>
   </div></footer>
 
   <div class="sheet-wrap" id="sheetWrap">
@@ -831,9 +895,14 @@ function staleRow(){
     <span class="val">${NP}회</span>
     <span class="verdict badge warn">현재 ${N}회</span></div>`;
 }
+function showSheet(html){
+  document.getElementById('sheetBody').innerHTML=html;
+  document.getElementById('sheetBody').scrollTop=0;
+  sheetWrap.classList.add('open');
+}
 function openSheet(){
   const m=MODELS[current];
-  document.getElementById('sheetBody').innerHTML=`
+  showSheet(`
     <div class="sheet-title">${m.title}<span class="badge ${m.badge[0]}">${m.badge[1]}</span></div>
     <div class="brief-block"><div class="brief-k">가정</div><div class="brief-v">${m.assume}</div></div>
     <div class="brief-block"><div class="brief-k">근거와 해석</div><div class="brief-v">${m.logic}</div></div>
@@ -842,8 +911,7 @@ function openSheet(){
       <div class="evi">${staleRow()}${m.evidence.map(e=>
         `<div class="evi-row"><span class="lab">${e[0]}</span><span class="val">${e[1]}</span>
          <span class="verdict badge ${e[2]}">${e[3]}</span></div>`).join('')}</div></div>
-    <div class="brief-block"><div class="brief-k">해석</div><div class="brief-v">${m.note}</div></div>`;
-  sheetWrap.classList.add('open');
+    <div class="brief-block"><div class="brief-k">해석</div><div class="brief-v">${m.note}</div></div>`);
 }
 sheetWrap.addEventListener('click',e=>{
   if(e.target.dataset.close) sheetWrap.classList.remove('open');
@@ -1016,44 +1084,189 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
 }
+
+/* ---- 홈 화면 추가 안내 ---- */
+const UA = navigator.userAgent;
+// 홈 화면 아이콘으로 실행 중인지. iOS 사파리는 표준 대신 navigator.standalone을 쓴다.
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches
+                        || window.navigator.standalone === true;
+const platform = /iPhone|iPad|iPod/i.test(UA) ? 'ios'
+               : /Android/i.test(UA) ? 'android' : 'desktop';
+// 카카오톡·인스타그램 등 앱 안에 든 브라우저에는 홈 화면 추가 메뉴 자체가 없다.
+const inAppBrowser = /KAKAOTALK|Instagram|FBAN|FBAV|FB_IAB|NAVER\(inapp|DaumApps|BAND|Snapchat|Line\/|everytimeapp|KAKAOSTORY/i.test(UA);
+
+let deferredPrompt = null;   // 안드로이드 크롬 계열만 발생시킨다
+let installTab = platform === 'android' ? 'android' : 'ios';
+
+const PHONE_ART = `<svg viewBox="0 0 200 300" width="150" height="225" fill="none" role="img"
+  aria-label="홈 화면에 로또 통계 아이콘이 추가된 모습">
+  <rect x="8" y="8" width="184" height="284" rx="26" fill="#fff" stroke="var(--line)" stroke-width="2.5"/>
+  <rect x="72" y="16" width="56" height="8" rx="4" fill="var(--line)"/>
+  <g fill="var(--inner)">
+    <rect x="30" y="52" width="34" height="34" rx="10"/><rect x="83" y="52" width="34" height="34" rx="10"/>
+    <rect x="136" y="52" width="34" height="34" rx="10"/><rect x="30" y="104" width="34" height="34" rx="10"/>
+    <rect x="136" y="104" width="34" height="34" rx="10"/><rect x="30" y="156" width="34" height="34" rx="10"/>
+    <rect x="83" y="156" width="34" height="34" rx="10"/><rect x="136" y="156" width="34" height="34" rx="10"/>
+  </g>
+  <g class="ball-pop">
+    <rect x="83" y="104" width="34" height="34" rx="10" fill="var(--blue)"/>
+    <circle cx="93" cy="114" r="6" fill="var(--b1)"/><circle cx="107" cy="116" r="6" fill="var(--b2)"/>
+    <circle cx="97" cy="127" r="6" fill="var(--b3)"/><circle cx="110" cy="128" r="5" fill="var(--b5)"/>
+    <rect x="86" y="143" width="28" height="4" rx="2" fill="var(--line)"/>
+  </g>
+  <rect x="30" y="238" width="140" height="42" rx="16" fill="var(--inner)"/>
+  <rect x="66" y="284" width="68" height="3" rx="1.5" fill="var(--line)"/>
+</svg>`;
+
+// 브라우저마다 메뉴 위치와 이름이 달라 실제로 헤매는 지점만 hint로 덧붙인다.
+const GUIDES = {
+  ios: [
+    {badge:'iOS 26+', title:'사파리', sub:'공유 버튼이 점 세 개 메뉴 안으로 들어갔어요', open:true,
+     steps:[['사파리에서 이 페이지를 엽니다.'],
+            ['주소창 오른쪽 [···] 버튼을 누릅니다.','탭 바가 컴팩트 상태이면 공유 아이콘이 이 메뉴 안에 있어요.'],
+            ['메뉴에서 [공유]를 누릅니다.'],
+            ['목록을 아래로 내려 [홈 화면에 추가]를 선택합니다.'],
+            ['이름을 확인하고 오른쪽 위 [추가]를 누릅니다.']],
+     tip:'공유 버튼을 예전처럼 바로 보이게 하려면 설정 → 앱 → Safari → 탭에서 [컴팩트] 대신 [하단] 또는 [상단]을 고르면 됩니다.'},
+    {badge:'iOS 16–18', title:'사파리', sub:'공유 버튼이 화면 아래 가운데에 있어요',
+     steps:[['사파리에서 이 페이지를 엽니다.'],
+            ['화면 아래 가운데 [공유] 버튼을 누릅니다.','네모 위로 화살표가 솟은 모양이에요.'],
+            ['목록을 아래로 내려 [홈 화면에 추가]를 선택합니다.'],
+            ['오른쪽 위 [추가]를 누릅니다.']],
+     tip:'iOS 15 이하 구형 아이폰도 순서는 같습니다.'},
+    {badge:'크롬', title:'아이폰의 크롬 · 엣지', sub:'iOS 16.4 이상에서만 가능합니다',
+     steps:[['크롬에서 이 페이지를 엽니다.'],
+            ['주소창 오른쪽 [공유] 버튼을 누릅니다.'],
+            ['[홈 화면에 추가]를 선택하고 [추가]를 누릅니다.']],
+     tip:'메뉴가 보이지 않으면 iOS 16.3 이하일 수 있어요. 그때는 사파리로 열어 위쪽 안내를 따라주세요.'}
+  ],
+  android: [
+    {badge:'크롬', title:'구글 크롬', sub:'가장 많이 쓰는 방법이에요', open:true,
+     steps:[['크롬에서 이 페이지를 엽니다.'],
+            ['오른쪽 위 [⋮] 버튼을 누릅니다.'],
+            ['[홈 화면에 추가] 또는 [앱 설치]를 누릅니다.','둘 중 하나만 보여요. 어느 쪽이든 결과는 같습니다.'],
+            ['[설치]를 누르면 홈 화면에 아이콘이 생깁니다.']],
+     tip:'[앱 설치]라고 뜨는 이유 — 이 페이지는 앱처럼 실행되도록 만들어져 있어서 크롬이 설치 안내를 대신 보여줍니다. 플레이스토어를 거치지 않고 아이콘만 생기며 저장 공간도 거의 쓰지 않아요.'},
+    {badge:'삼성', title:'삼성 인터넷', sub:'갤럭시 기본 브라우저',
+     steps:[['삼성 인터넷에서 이 페이지를 엽니다.'],
+            ['화면 아래 오른쪽 [≡] 메뉴를 누릅니다.','메뉴 막대를 위쪽에 두는 설정이면 오른쪽 위에 있어요.'],
+            ['[현재 페이지 추가]를 누릅니다.'],
+            ['[홈 화면]을 고르고 [추가]를 누릅니다.']]},
+    {badge:'기타', title:'웨일 · 엣지 · 파이어폭스', sub:'이름만 다르고 순서는 같아요',
+     steps:[['브라우저에서 이 페이지를 엽니다.'],
+            ['메뉴 버튼을 누릅니다.','웨일과 파이어폭스는 아래쪽, 엣지는 아래 가운데에 있어요.'],
+            ['[홈 화면에 추가]를 누릅니다.','파이어폭스는 [설치]로 표시됩니다.']],
+     tip:'메뉴에 항목이 없다면 브라우저가 오래되었거나 홈 화면 추가를 지원하지 않는 것입니다. 크롬이나 삼성 인터넷으로 열어주세요.'}
+  ]
+};
+
+const cardHTML = g => `<details class="ig-card"${g.open?' open':''}>
+  <summary><span class="bdg">${g.badge}</span>
+    <span class="ttl"><b>${g.title}</b><span>${g.sub}</span></span>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  </summary>
+  <ol class="ig-steps">${g.steps.map(([t,h],i)=>
+    `<li><span class="n">${i+1}</span><div class="t">${t}</div>${h?`<div class="h">${h}</div>`:''}</li>`).join('')}
+  </ol>
+  ${g.tip?`<div class="ig-tip">${g.tip}</div>`:''}
+</details>`;
+
+function installGuideHTML(){
+  if(isStandalone()) return `
+    <div class="sheet-title">홈 화면에 추가</div>
+    <div class="ig-done">
+      <div class="mark"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <h3>이미 홈 화면에 있어요</h3>
+      <p>지금 홈 화면 아이콘으로 실행 중이에요.<br>따로 하실 일은 없습니다.</p>
+    </div>`;
+
+  const oneTap = deferredPrompt ? `<div class="ig-now">
+      <button class="cta" id="igInstall">홈 화면에 추가하기</button>
+      <div class="hint">버튼을 누르면 바로 추가돼요. 아래 안내는 읽지 않으셔도 됩니다.</div>
+      <div class="ig-msg" id="igMsg"></div>
+    </div>` : '';
+
+  const warn = inAppBrowser ? `<div class="ig-warn">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+      <p><span class="b">지금은 앱 안의 브라우저로 보고 있어요</span>
+      카카오톡·인스타그램 안에서 열린 화면에는 홈 화면 추가 메뉴가 없습니다.
+      오른쪽 위(또는 아래) 메뉴에서 [다른 브라우저로 열기]를 누른 뒤 아래 안내를 따라주세요.</p>
+    </div>` : '';
+
+  return `
+    <div class="sheet-title">홈 화면에 추가</div>
+    <div class="ig-hero">${PHONE_ART}</div>
+    <div class="ig-lead">설치 파일도, 스토어도 필요 없어요. 쓰던 브라우저에서 몇 번만 누르면
+      아이콘이 생기고, 그 뒤로는 인터넷이 끊겨도 그대로 열립니다.</div>
+    ${oneTap}
+    <div class="ig-url"><code>${location.host || '이 페이지 주소'}</code>
+      <button id="igCopy">주소 복사</button></div>
+    ${warn}
+    <div class="ig-tabs" role="tablist" aria-label="기기 선택">
+      <button role="tab" data-tab="ios" aria-selected="${installTab==='ios'}">아이폰</button>
+      <button role="tab" data-tab="android" aria-selected="${installTab==='android'}">안드로이드</button>
+    </div>
+    <div id="igPanel">${GUIDES[installTab].map(cardHTML).join('')}</div>
+    <div class="ig-foot">추가한 아이콘은 일반 앱처럼 길게 눌러 옮기거나 지울 수 있어요.<br>
+      기기와 브라우저 버전에 따라 메뉴 이름이 조금씩 다를 수 있습니다.</div>`;
+}
+
+function openInstallGuide(){
+  showSheet(installGuideHTML());
+  const body=document.getElementById('sheetBody');
+
+  const tabs=body.querySelector('.ig-tabs');
+  if(tabs) tabs.addEventListener('click',e=>{
+    const b=e.target.closest('[data-tab]'); if(!b) return;
+    installTab=b.dataset.tab;
+    [...tabs.children].forEach(x=>x.setAttribute('aria-selected', String(x===b)));
+    document.getElementById('igPanel').innerHTML=GUIDES[installTab].map(cardHTML).join('');
+  });
+
+  const copy=document.getElementById('igCopy');
+  if(copy) copy.addEventListener('click',()=>{
+    copyText(location.href).then(ok=>{        // 결과 복사 버튼과 같은 폴백을 그대로 쓴다
+      copy.textContent=ok?'복사 완료':'복사 실패';
+      setTimeout(()=>copy.textContent='주소 복사',1500);
+    });
+  });
+
+  const now=document.getElementById('igInstall');
+  if(now) now.addEventListener('click',async()=>{
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const {outcome}=await deferredPrompt.userChoice;
+    deferredPrompt=null;                       // 프롬프트는 한 번만 쓸 수 있다
+    if(outcome==='dismissed'){
+      document.getElementById('igMsg').textContent='추가를 취소하셨어요. 아래 안내를 따라 직접 추가하실 수도 있습니다.';
+      now.disabled=true; now.style.opacity='.5';
+    } else {
+      sheetWrap.classList.remove('open');
+    }
+  });
+}
+
+document.getElementById('footInstall').addEventListener('click',openInstallGuide);
+
 (function(){
-  const tip = document.getElementById('installTip');
-  const txt = document.getElementById('installTxt');
-  const btn = document.getElementById('installBtn');
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-                     || window.navigator.standalone === true;
-  let closed = false;
-  try { closed = localStorage.getItem('installTipClosed') === '1'; } catch(e) {}
-  if (standalone || closed) return;
-
-  let deferred = null;
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-
-  document.getElementById('installX').addEventListener('click', () => {
+  const tip=document.getElementById('installTip');
+  document.getElementById('installBtn').addEventListener('click',openInstallGuide);
+  document.getElementById('installX').addEventListener('click',()=>{
     tip.classList.remove('show');
-    try { localStorage.setItem('installTipClosed','1'); } catch(e){}
+    try{ localStorage.setItem('installTipClosed','1'); }catch(e){}
   });
 
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault(); deferred = e;
-    txt.textContent = '홈 화면에 추가하면 앱처럼 바로 열 수 있어요';
-    btn.style.display = '';
-    tip.classList.add('show');
-  });
+  // 프롬프트는 배너를 닫았든 말든 잡아둬야 안내 안의 원탭 설치가 살아있다.
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; });
+  window.addEventListener('appinstalled',()=>{ deferredPrompt=null; tip.classList.remove('show'); });
 
-  if (isIOS) {
-    txt.textContent = '하단 공유 버튼을 누르고 "홈 화면에 추가"를 선택하세요';
-    btn.style.display = 'none';
-    tip.classList.add('show');
-  }
-
-  btn.addEventListener('click', async () => {
-    if (!deferred) return;
-    deferred.prompt();
-    await deferred.userChoice;
-    deferred = null;
-    tip.classList.remove('show');
-  });
+  let closed=false;
+  try{ closed=localStorage.getItem('installTipClosed')==='1'; }catch(e){}
+  if(isStandalone()||closed) return;
+  if(platform==='ios'||platform==='android') tip.classList.add('show');
 })();
 
 </script>

@@ -1,5 +1,5 @@
 // 앱 데이터가 index.html에 전부 내장되어 있어 캐시만으로 완전 오프라인 동작합니다.
-const CACHE = 'lotto645-v8';
+const CACHE = 'lotto645-v9';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
