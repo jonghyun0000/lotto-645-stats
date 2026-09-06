@@ -154,12 +154,11 @@ function popularity(rank, key) {
   };
 }
 
-// ---------- m9 : 수령액 우선 (32~45 풀) ----------
-// 번호별 인기도는 1~12 > 13~31 > 32~45 순으로 뚜렷하다. 수령액을 우선하면
-// 가장 비인기인 32~45만 쓰는 것이 최선이다. 대신 14개뿐이라 완전분리가
-// 2게임까지로 줄어 "적어도 하나 당첨" 확률은 떨어진다. 그 대가를 숨기지 않고 함께 낸다.
-const M9_POOL = Array.from({ length: 14 }, (_, i) => i + 32);
-
+// ---------- m9 : 수령액 우선 (데이터로 고른 비인기 풀) ----------
+// 번호별 인기도를 적합해 가장 덜 고르는 14개를 풀로 삼는다.
+// 구간(32~45)으로 자르는 것보다 낫다는 것을 워크포워드로 확인하고, 그 결과를 함께 낸다.
+// 인샘플 적합치는 효과를 과장하므로(학습->검증 기울기가 1이 아니라 0.5 수준),
+// 화면에 내보내는 배수는 인샘플이 아니라 검증으로 measured 한 값을 쓴다.
 function combined() {
   const S = usable.filter(d => d.r3 > 0);
   const ratio = S.map(d => d.r3 / (games(d) * PROB[3]));
@@ -167,20 +166,49 @@ function combined() {
   const tSeven = ols(S.map(tail7), ratio).t;
   const tHigh = ols(S.map(d => d.nums.filter(n => n >= 32).length), ratio).t;
 
-  const { w, overall } = numberWeights();
-  const band = (lo, hi) => mean(w.slice(lo - 1, hi));
-  const multOf = pool => overall / (6 * mean(pool.map(n => w[n - 1])));
+  const full = numberWeights(S);
+  const pool = leastPopular(full.w);
+  const BAND = Array.from({ length: 14 }, (_, i) => i + 32);
+  const multWith = (p, w, ov) => ov / (6 * mean(p.map(n => w[n - 1])));
+  const band = (lo, hi) => mean(full.w.slice(lo - 1, hi));
 
-  // 앱과 같은 방식으로 묶음을 구성해 도달 확률을 전수 계산한다.
-  // 구성이 무작위라 여러 번 만들어 평균을 낸다(구조가 같아 편차는 미미하다).
+  // 학습 구간만 보고 고른 풀을, 그 뒤 구간으로만 평가한다. 미래 정보는 쓰지 않는다.
+  const cuts = [400, 500, 620, 700, 800, 900].filter(c => c < S.length - 200);
+  const oosSel = [], oosBand = [];
+  for (const c of cuts) {
+    const sel = leastPopular(numberWeights(S.slice(0, c)).w);
+    const ev = numberWeights(S.slice(c));
+    oosSel.push(multWith(sel, ev.w, ev.overall));
+    oosBand.push(multWith(BAND, ev.w, ev.overall));
+  }
+
+  // 워크포워드: 구간마다 앞쪽으로 고르고 그 구간에서 예측력(t)을 잰다.
+  const STEP = 120;
+  let wfT = 0, wfBandT = 0, wins = 0, segs = 0;
+  for (let c = 400; c + STEP <= S.length; c += STEP) {
+    const sel = leastPopular(numberWeights(S.slice(0, c)).w);
+    const TE = S.slice(c, c + STEP), y = TE.map(d => d.r3 / (games(d) * PROB[3]));
+    const tOf = p => ols(TE.map(d => d.nums.filter(n => p.includes(n)).length), y).t;
+    const a = tOf(sel), b = tOf(BAND);
+    wfT += a; wfBandT += b; if (a < b) wins++; segs++;
+  }
+
+  // 학습 가중치가 검증 구간으로 얼마나 이어지는가 (기울기 1이면 그대로 이어짐)
+  const halfN = Math.floor(S.length / 2);
+  const wTR = numberWeights(S.slice(0, halfN)).w;
+  const TE2 = S.slice(halfN);
+  const carry = ols(TE2.map(d => d.nums.reduce((a, n) => a + wTR[n - 1], 0)),
+                    TE2.map(d => d.r3 / (games(d) * PROB[3])));
+
+  // 앱과 같은 방식으로 묶음을 구성해 도달 확률을 전수 계산
   const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [b[i], b[j]] = [b[j], b[i]]; } return b; };
   const buildPortfolio = k => {
-    const out = [], cap = Math.floor(M9_POOL.length / 6), s = shuffle(M9_POOL);
-    for (let i = 0; i < Math.min(k, cap); i++) out.push(s.slice(i * 6, i * 6 + 6).sort((a, b) => a - b));
+    const out = [], cap = Math.floor(pool.length / 6), sp = shuffle(pool);
+    for (let i = 0; i < Math.min(k, cap); i++) out.push(sp.slice(i * 6, i * 6 + 6).sort((a, b) => a - b));
     while (out.length < k) {
       let best = null, bo = 99;
       for (let t = 0; t < 3000; t++) {
-        const c = shuffle(M9_POOL).slice(0, 6).sort((a, b) => a - b);
+        const c = shuffle(pool).slice(0, 6).sort((a, b) => a - b);
         const o = out.reduce((mx, x) => Math.max(mx, c.filter(n => x.includes(n)).length), 0);
         if (o < bo) { bo = o; best = c; if (bo <= 1) break; }
       }
@@ -195,17 +223,22 @@ function combined() {
     reach[k] = +(acc / R).toFixed(6);
   }
 
-  // 1등 기준 동시당첨 인원 대비
   const S1 = usable.filter(d => d.r1 > 0);
   const base1 = mean(S1.map(games)) * PROB[1];
   const all1 = mean(S1.map(d => d.r1 / (games(d) * PROB[1])));
-  const mult = multOf(M9_POOL);
+  const mult = mean(oosSel);
 
   return {
+    pool, poolSize: pool.length,
+    mult: +mult.toFixed(4),                          // 검증으로 잰 값 — 화면에 쓰는 값
+    multIn: +multWith(pool, full.w, full.overall).toFixed(4),  // 인샘플 적합치 (과장됨)
+    multBand: +mean(oosBand).toFixed(4),             // 같은 방식으로 잰 32~45
+    carrySlope: +carry.b.toFixed(3), carryT: +carry.t.toFixed(2),
+    wfT: +(wfT / segs).toFixed(2), wfBandT: +(wfBandT / segs).toFixed(2),
+    wfWins: wins, wfSegs: segs, oosCuts: cuts.length,
+    maxDisjoint: Math.floor(pool.length / 6), reach,
     tLow: +tLow.toFixed(2), tSeven: +tSeven.toFixed(2), tHigh: +tHigh.toFixed(2),
-    mult: +mult.toFixed(4), maxDisjoint: Math.floor(M9_POOL.length / 6), reach,
     bandLow: +band(1, 12).toFixed(4), bandMid: +band(13, 31).toFixed(4), bandHigh: +band(32, 45).toFixed(4),
-    multClean30: +multOf(Array.from({ length: 33 }, (_, i) => i + 13).filter(n => n % 10 !== 7)).toFixed(4),
     r1All: +(all1 * base1).toFixed(1), r1Pool: +(all1 * base1 / mult).toFixed(1),
   };
 }
@@ -250,8 +283,7 @@ function tamper() {
 // 회차별 인기비율을 "당첨번호 6개의 번호별 인기도 합"으로 보고 45개 지시변수 OLS로 푼다
 // (6개가 항상 켜져 있어 절편은 넣지 않는다). 이렇게 하면 어떤 번호 풀이든
 // 관측이 없어도 수령액 배수를 추정할 수 있다.
-function numberWeights() {
-  const S = usable.filter(d => d.r3 > 0);
+function numberWeights(S = usable.filter(d => d.r3 > 0)) {
   const y = S.map(d => d.r3 / (games(d) * PROB[3]));
   const X = S.map(d => { const r = new Float64Array(45); d.nums.forEach(n => (r[n - 1] = 1)); return r; });
   const A = Array.from({ length: 45 }, () => new Float64Array(46));
@@ -272,6 +304,9 @@ function numberWeights() {
   const w = Array.from({ length: 45 }, (_, i) => A[i][45] / A[i][i]);
   return { w, overall: mean(y) };
 }
+const POOL_SIZE = 14;
+const leastPopular = (w, k = POOL_SIZE) =>
+  w.map((v, i) => ({ n: i + 1, v })).sort((a, b) => a.v - b.v).slice(0, k).map(x => x.n).sort((a, b) => a - b);
 
 // 티켓 묶음이 "적어도 하나 5등 이상"일 확률. 근사가 아니라 전수 계산이다.
 // 추첨결과 중 풀 바깥 번호는 어떤 티켓과도 맞지 않으므로 풀과의 교집합만 훑는다.
@@ -387,6 +422,9 @@ const m1 = popularity(1, 'r1');
 const m5 = popularity(3, 'r3');
 const m9 = combined();
 const m3 = tamper();
+const fft = periodicity();
+const rej = rejected();
+const prize = prizes();
 
 const show = (nm, m) => {
   console.log(`${nm}  n=${m.n}  기울기 ${m.coef >= 0 ? '+' : ''}${m.coef}  t=${m.t}  p=${m.p}  순열 p<${m.permP.toExponential(1)}`);
@@ -398,15 +436,11 @@ show('m1 (1등)', m1);
 console.log();
 show('m5 (3등)', m5);
 console.log();
-console.log(`m9  구간 인기도  1~12 ${m9.bandLow}  13~31 ${m9.bandMid}  32~45 ${m9.bandHigh}`);
-console.log(`    t: 12이하 +${m9.tLow}  끝자리7 +${m9.tSeven}  32이상 ${m9.tHigh}`);
-console.log(`    수령액 배수  32~45 풀 x${m9.mult}  (참고: 기존 클린30 풀 x${m9.multClean30})`);
-console.log(`    완전분리 최대 ${m9.maxDisjoint}게임 · 5등이상 도달확률`);
-console.log('      ' + [1,3,5,7,10].map(k=>k+'게임 '+(m9.reach[k]*100).toFixed(3)+'%').join('  '));
-console.log();
-const fft = periodicity();
-const rej = rejected();
-const prize = prizes();
+console.log(`m9  풀(${m9.poolSize}개) ${m9.pool.join(',')}`);
+console.log(`    구간 인기도  1~12 ${m9.bandLow}  13~31 ${m9.bandMid}  32~45 ${m9.bandHigh}`);
+console.log(`    수령액 배수  인샘플 x${m9.multIn}  →  검증 x${m9.mult}   (32~45 검증 x${m9.multBand})`);
+console.log(`    워크포워드   t ${m9.wfT} vs 32~45 ${m9.wfBandT} · ${m9.wfWins}/${m9.wfSegs} 구간 우위 · 이어짐 기울기 ${m9.carrySlope}`);
+console.log(`    완전분리 최대 ${m9.maxDisjoint}게임 · 5등이상 ` + [1,3,5,7,10].map(k=>k+'게임 '+(m9.reach[k]*100).toFixed(3)+'%').join('  '));
 console.log('m3 ', JSON.stringify({ ...m3, ...fft }));
 console.log('기각', JSON.stringify(rej));
 console.log('상금', JSON.stringify(prize));
