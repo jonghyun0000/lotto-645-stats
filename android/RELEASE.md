@@ -29,12 +29,44 @@
 
 ## 빌드
 
+### 처음 한 번만 — 도구 준비
+
+`bubblewrap`은 전역 설치가 권한 문제로 막혀 로컬에 설치해 썼습니다. 새 환경에서는 다시 받아야 합니다.
+
+```bash
+mkdir -p ~/.bubblewrap-tools && cd ~/.bubblewrap-tools && npm install @bubblewrap/cli
+```
+
+Bubblewrap은 **JDK 17이 정확히** 필요하고(21은 거부합니다), Android SDK 루트에서 `bin`을
+찾습니다. 이 맥에서는 아래처럼 맞춰 두었습니다.
+
+```bash
+# JDK 17 경로는 /usr/libexec/java_home -V 로 확인
+cat > ~/.bubblewrap/config.json <<'JSON'
+{
+  "jdkPath": "/Library/Java/JavaVirtualMachines/temurin-17.jdk",
+  "androidSdkPath": "/Users/jonghyun/Library/Android/sdk"
+}
+JSON
+
+# cmdline-tools 가 없으면 받아서 넣고, SDK 루트에 bin 링크를 만든다
+ln -sfn ~/Library/Android/sdk/cmdline-tools/latest/bin ~/Library/Android/sdk/bin
+
+~/.bubblewrap-tools/node_modules/.bin/bubblewrap doctor   # 통과하는지 확인
+```
+
+### 빌드
+
 ```bash
 cd android
 export BUBBLEWRAP_KEYSTORE_PASSWORD="$(cat ~/.keystores/lotto645-upload.pass)"
 export BUBBLEWRAP_KEY_PASSWORD="$BUBBLEWRAP_KEYSTORE_PASSWORD"
-bubblewrap build --skipPwaValidation
+~/.bubblewrap-tools/node_modules/.bin/bubblewrap build --skipPwaValidation
 ```
+
+첫 빌드는 Gradle 배포판(약 130MB)을 받느라 몇 분 걸립니다. **중간에 끊지 마세요** —
+받다 만 zip이 남으면 `zip END header not found`로 실패합니다. 그럴 때는
+`rm -rf ~/.gradle/wrapper/dists/gradle-*-bin` 으로 지우고 다시 실행하면 됩니다.
 
 `app-release-bundle.aab`(플레이 업로드용)와 `app-release-signed.apk`(직접 설치용)가 나옵니다.
 
@@ -84,3 +116,10 @@ relation=delegate_permission/common.handle_all_urls"
 ```
 
 주소창이 보이지 않으면 도메인 검증이 정상입니다. 보인다면 assetlinks 지문을 확인하세요.
+
+에뮬레이터로 확인한 결과는 `screenshot-emulator.png` 입니다. 검증 당시 상태:
+최상단 액티비티가 `TranslucentCustomTabActivity`(TWA 호스트)이고 UI 트리에 `url_bar` 요소가 0개였습니다.
+
+에뮬레이터로 볼 때 주의할 점 두 가지가 있습니다. `-gpu swiftshader_indirect`는 너무 느려
+System UI가 응답을 멈추므로 `-gpu auto`를 쓰세요. 그리고 TWA는 Chrome을 통해 뜨기 때문에
+Chrome 첫 실행 화면(계정 등록 안내)을 먼저 넘겨야 앱 화면이 나옵니다.
