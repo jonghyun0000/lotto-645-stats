@@ -154,23 +154,59 @@ function popularity(rank, key) {
   };
 }
 
-// ---------- m9 : 12 이하 + 끝자리 7 동시 ----------
+// ---------- m9 : 수령액 우선 (32~45 풀) ----------
+// 번호별 인기도는 1~12 > 13~31 > 32~45 순으로 뚜렷하다. 수령액을 우선하면
+// 가장 비인기인 32~45만 쓰는 것이 최선이다. 대신 14개뿐이라 완전분리가
+// 2게임까지로 줄어 "적어도 하나 당첨" 확률은 떨어진다. 그 대가를 숨기지 않고 함께 낸다.
+const M9_POOL = Array.from({ length: 14 }, (_, i) => i + 32);
+
 function combined() {
   const S = usable.filter(d => d.r3 > 0);
   const ratio = S.map(d => d.r3 / (games(d) * PROB[3]));
   const tLow = ols(S.map(lowCnt), ratio).t;
   const tSeven = ols(S.map(tail7), ratio).t;
-  const clean = ratio.filter((_, i) => lowCnt(S[i]) === 0 && tail7(S[i]) === 0);
-  // 1등 기준으로도 같은 대비를 만들어 "동시당첨 몇 명 -> 몇 명"을 낼 수 있게 한다
+  const tHigh = ols(S.map(d => d.nums.filter(n => n >= 32).length), ratio).t;
+
+  const { w, overall } = numberWeights();
+  const band = (lo, hi) => mean(w.slice(lo - 1, hi));
+  const multOf = pool => overall / (6 * mean(pool.map(n => w[n - 1])));
+
+  // 앱과 같은 방식으로 묶음을 구성해 도달 확률을 전수 계산한다.
+  // 구성이 무작위라 여러 번 만들어 평균을 낸다(구조가 같아 편차는 미미하다).
+  const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [b[i], b[j]] = [b[j], b[i]]; } return b; };
+  const buildPortfolio = k => {
+    const out = [], cap = Math.floor(M9_POOL.length / 6), s = shuffle(M9_POOL);
+    for (let i = 0; i < Math.min(k, cap); i++) out.push(s.slice(i * 6, i * 6 + 6).sort((a, b) => a - b));
+    while (out.length < k) {
+      let best = null, bo = 99;
+      for (let t = 0; t < 3000; t++) {
+        const c = shuffle(M9_POOL).slice(0, 6).sort((a, b) => a - b);
+        const o = out.reduce((mx, x) => Math.max(mx, c.filter(n => x.includes(n)).length), 0);
+        if (o < bo) { bo = o; best = c; if (bo <= 1) break; }
+      }
+      out.push(best);
+    }
+    return out;
+  };
+  const reach = {};
+  for (let k = 1; k <= 10; k++) {
+    let acc = 0; const R = 3;
+    for (let i = 0; i < R; i++) acc += exactAtLeastOne(buildPortfolio(k));
+    reach[k] = +(acc / R).toFixed(6);
+  }
+
+  // 1등 기준 동시당첨 인원 대비
   const S1 = usable.filter(d => d.r1 > 0);
-  const rt1 = S1.map(d => d.r1 / (games(d) * PROB[1]));
   const base1 = mean(S1.map(games)) * PROB[1];
-  const cl1 = rt1.filter((_, i) => lowCnt(S1[i]) === 0 && tail7(S1[i]) === 0);
+  const all1 = mean(S1.map(d => d.r1 / (games(d) * PROB[1])));
+  const mult = multOf(M9_POOL);
+
   return {
-    tLow: +tLow.toFixed(2), tSeven: +tSeven.toFixed(2),
-    cleanMult: +(mean(ratio) / mean(clean)).toFixed(4), cleanN: clean.length,
-    r1All: +(mean(rt1) * base1).toFixed(1), r1Clean: +(mean(cl1) * base1).toFixed(1),
-    r1Mult: +(mean(rt1) / mean(cl1)).toFixed(3),
+    tLow: +tLow.toFixed(2), tSeven: +tSeven.toFixed(2), tHigh: +tHigh.toFixed(2),
+    mult: +mult.toFixed(4), maxDisjoint: Math.floor(M9_POOL.length / 6), reach,
+    bandLow: +band(1, 12).toFixed(4), bandMid: +band(13, 31).toFixed(4), bandHigh: +band(32, 45).toFixed(4),
+    multClean30: +multOf(Array.from({ length: 33 }, (_, i) => i + 13).filter(n => n % 10 !== 7)).toFixed(4),
+    r1All: +(all1 * base1).toFixed(1), r1Pool: +(all1 * base1 / mult).toFixed(1),
   };
 }
 
@@ -208,6 +244,62 @@ function tamper() {
     gapMean: +gm.toFixed(3), gapTheory: +(1 / p6).toFixed(2),
     gapVar: +gv.toFixed(2), gapVarTheory: +((1 - p6) / p6 ** 2).toFixed(2),
   };
+}
+
+// ---------- 번호별 인기도 ----------
+// 회차별 인기비율을 "당첨번호 6개의 번호별 인기도 합"으로 보고 45개 지시변수 OLS로 푼다
+// (6개가 항상 켜져 있어 절편은 넣지 않는다). 이렇게 하면 어떤 번호 풀이든
+// 관측이 없어도 수령액 배수를 추정할 수 있다.
+function numberWeights() {
+  const S = usable.filter(d => d.r3 > 0);
+  const y = S.map(d => d.r3 / (games(d) * PROB[3]));
+  const X = S.map(d => { const r = new Float64Array(45); d.nums.forEach(n => (r[n - 1] = 1)); return r; });
+  const A = Array.from({ length: 45 }, () => new Float64Array(46));
+  for (let a = 0; a < 45; a++) {
+    for (let b = 0; b < 45; b++) { let t = 0; for (let i = 0; i < X.length; i++) t += X[i][a] * X[i][b]; A[a][b] = t; }
+    let t = 0; for (let i = 0; i < X.length; i++) t += X[i][a] * y[i]; A[a][45] = t;
+  }
+  for (let c = 0; c < 45; c++) {                 // 가우스-조던
+    let piv = c;
+    for (let r = c + 1; r < 45; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+    [A[c], A[piv]] = [A[piv], A[c]];
+    for (let r = 0; r < 45; r++) {
+      if (r === c) continue;
+      const f = A[r][c] / A[c][c];
+      for (let k = c; k <= 45; k++) A[r][k] -= f * A[c][k];
+    }
+  }
+  const w = Array.from({ length: 45 }, (_, i) => A[i][45] / A[i][i]);
+  return { w, overall: mean(y) };
+}
+
+// 티켓 묶음이 "적어도 하나 5등 이상"일 확률. 근사가 아니라 전수 계산이다.
+// 추첨결과 중 풀 바깥 번호는 어떤 티켓과도 맞지 않으므로 풀과의 교집합만 훑는다.
+// JS 비트 시프트는 32비트라 풀이 32개를 넘으면 lo/hi 두 워드로 나눈다.
+const popcnt = x => { x -= (x >> 1) & 0x55555555; x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+                      return (((x + (x >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24; };
+function exactAtLeastOne(tickets) {
+  const pool = [...new Set(tickets.flat())].sort((a, b) => a - b);
+  const m = pool.length, outside = 45 - m;
+  const idx = new Map(pool.map((n, i) => [n, i]));
+  const tlo = [], thi = [];
+  for (const t of tickets) {
+    let lo = 0, hi = 0;
+    for (const n of t) { const i = idx.get(n); if (i < 32) lo |= 1 << i; else hi |= 1 << (i - 32); }
+    tlo.push(lo); thi.push(hi);
+  }
+  let fav = 0;
+  const walk = (start, depth, j, lo, hi) => {
+    if (depth === j) {
+      for (let a = 0; a < tlo.length; a++)
+        if (popcnt(lo & tlo[a]) + popcnt(hi & thi[a]) >= 3) { fav += C(outside, 6 - j); return; }
+      return;
+    }
+    for (let i = start; i <= m - (j - depth); i++)
+      walk(i + 1, depth + 1, j, i < 32 ? lo | (1 << i) : lo, i < 32 ? hi : hi | (1 << (i - 32)));
+  };
+  for (let j = 3; j <= 6; j++) walk(0, 0, j, 0, 0);
+  return fav / TOTAL;
 }
 
 // ---------- 기각된 가설들 ----------
@@ -306,7 +398,11 @@ show('m1 (1등)', m1);
 console.log();
 show('m5 (3등)', m5);
 console.log();
-console.log(`m9  12이하 t=${m9.tLow}  끝자리7 t=${m9.tSeven}  클린 배수 x${m9.cleanMult} (n=${m9.cleanN})`);
+console.log(`m9  구간 인기도  1~12 ${m9.bandLow}  13~31 ${m9.bandMid}  32~45 ${m9.bandHigh}`);
+console.log(`    t: 12이하 +${m9.tLow}  끝자리7 +${m9.tSeven}  32이상 ${m9.tHigh}`);
+console.log(`    수령액 배수  32~45 풀 x${m9.mult}  (참고: 기존 클린30 풀 x${m9.multClean30})`);
+console.log(`    완전분리 최대 ${m9.maxDisjoint}게임 · 5등이상 도달확률`);
+console.log('      ' + [1,3,5,7,10].map(k=>k+'게임 '+(m9.reach[k]*100).toFixed(3)+'%').join('  '));
 console.log();
 const fft = periodicity();
 const rej = rejected();
