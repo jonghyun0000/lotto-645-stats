@@ -33,6 +33,8 @@
     --num:"SF Mono","Roboto Mono",Consolas,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
   html{scroll-behavior:smooth}
   body{background:var(--bg);color:var(--txt);font-family:var(--font);line-height:1.5;
     -webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom)}
@@ -319,6 +321,7 @@
         <div class="seg" id="gameSeg"></div>
       </div>
       <div class="results" id="results"></div>
+      <p class="sr-only" id="srStatus" role="status" aria-live="polite"></p>
       <button class="cta" id="genBtn">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
         <span id="genLabel">5게임 뽑기</span>
@@ -349,7 +352,7 @@
 
   <div class="sheet-wrap" id="sheetWrap">
     <div class="sheet-dim" data-close="1"></div>
-    <div class="sheet">
+    <div class="sheet" id="sheetEl" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
       <div class="sheet-handle"></div>
       <div class="sheet-body" id="sheetBody"></div>
       <button class="sheet-close" data-close="1">닫기</button>
@@ -428,6 +431,7 @@ const GC = ['','var(--b1)','var(--b2)','var(--b3)','var(--b4)','var(--b5)'];
 const GT = ['','var(--b1-t)','var(--b2-t)','var(--b3-t)','var(--b4-t)','var(--b5-t)'];
 const fmtWon = v => Number(v).toLocaleString('ko-KR')+'원';
 const fmtEok = v => (v/1e8).toFixed(1)+'억원';
+const pc4 = v => (v*100).toFixed(4)+'%';
 const ballHTML = (n,sz) => `<div class="ball${sz?' '+sz:''} g${groupOf(n)}" data-n="${n}">${n}</div>`;
 // "YYYY-MM-DD"를 new Date()에 그대로 넣으면 UTC 자정으로 해석돼
 // UTC보다 뒤진 표준시 지역에서 날짜와 요일이 하루 밀린다. 로컬 자정으로 만든다.
@@ -479,6 +483,13 @@ const renderRank=(id,items)=>{ document.getElementById(id).innerHTML = items.map
    <span class="rank-count">${it.c}회</span></div>`).join(''); };
 renderRank('topList', byFreq.slice(0,5));
 renderRank('bottomList', [...byFreq].reverse().slice(0,5));
+
+// 역대 같은 6개 조합이 재출현한 횟수. 화면에 "0건"으로 박아두면 데이터가 바뀌어도 갱신되지 않는다.
+const dupCombos = (()=>{
+  const seen=new Set(); let d=0;
+  draws.forEach(x=>{ const k=[...x.nums].sort((a,b)=>a-b).join(','); if(seen.has(k)) d++; seen.add(k); });
+  return d;
+})();
 
 const dn=['','1–10','11–20','21–30','31–40','41–45'];
 let dh='';
@@ -719,12 +730,13 @@ const MODELS = {
       완전분리를 유지할 수 있어 모델 1·5의 수령액 이점을 함께 가져갑니다.`,
     algo:'번호가 서로 겹치지 않도록 게임 배치. 5게임까지는 12 이하 배제 풀 우선, 6게임 이상은 전체 45개 사용',
     evidence:[
-      ['단일 게임 5등↑ 확률','2.3834% (1/41.96)','ok','고정'],
-      ['3게임 완전분리 vs 무작위','7.1355% vs 7.0127%','ok','+1.8%'],
-      ['5게임 완전분리 vs 무작위','11.8679% vs 11.4877%','ok','+3.3%'],
-      ['7게임 완전분리 vs 무작위','16.5807% vs 15.6754%','ok','+5.8%'],
-      ['7게임 휠(12개 풀)','11.7327%','no','-29.2%'],
-      ['완전분리 가능 최대 게임수','7게임','warn','45÷6'],
+      ['단일 게임 5등↑ 확률',`${pc4(P.m8.disjoint[1])} (1/${(1/P.m8.disjoint[1]).toFixed(2)})`,'ok','고정'],
+      ...[3,5,7].map(g=>[`${g}게임 완전분리 vs 무작위`,
+        `${pc4(P.m8.disjoint[g])} vs ${pc4(P.m8.random[g])}`,'ok',
+        `+${((P.m8.disjoint[g]/P.m8.random[g]-1)*100).toFixed(1)}%`]),
+      ['7게임 휠(12개 풀)',pc4(P.m8.wheel12[7]),'no',
+        `${((P.m8.wheel12[7]/P.m8.disjoint[7]-1)*100).toFixed(1)}%`],
+      ['완전분리 가능 최대 게임수',`${P.m8.maxDisjoint}게임`,'warn','45÷6'],
       ['계산 방식','8,145,060건 전수','ok','근사 아님']
     ],
     note:`이 모델이 올리는 것은 "적어도 하나 당첨" 확률이지 기댓값이 아닙니다.
@@ -790,9 +802,9 @@ const MODELS = {
       ['조합 총 개수','8,145,060','ok','–'],
       ['1등 당첨 확률','1 / 8,145,060','ok','0.0000123%'],
       ['지금까지 소진된 조합',`${N}개 (${(N/8145060*100).toFixed(5)}%)`,'ok','–'],
-      ['역대 중복 출현 조합','0건','ok','–']
+      ['역대 중복 출현 조합',`${dupCombos}건`, dupCombos?'warn':'ok','–']
     ],
-    note:`${N}회 동안 같은 조합이 두 번 나온 적은 한 번도 없습니다. 전체 조합의 ${(N/8145060*100).toFixed(3)}%만 소진된 상태입니다.`,
+    note:`${N}회 동안 같은 조합이 두 번 나온 적은 ${dupCombos?`${dupCombos}번 있습니다`:'한 번도 없습니다'}. 전체 조합의 ${(N/8145060*100).toFixed(3)}%만 소진된 상태입니다.`,
     gen(){ return uniform(6).sort((a,b)=>a-b); },
     meta(g){ return `합계 ${g.reduce((a,b)=>a+b,0)}`; }
   }
@@ -869,7 +881,8 @@ const TAGS='ABCDEFGHIJ';
 
 /* ---- 모델 칩 ---- */
 const gridEl=document.getElementById('modelGrid');
-gridEl.innerHTML=ORDER.map(k=>`<button class="chip${k===current?' on':''}" data-k="${k}">${LABEL[k]}</button>`).join('');
+gridEl.innerHTML=ORDER.map(k=>
+  `<button class="chip${k===current?' on':''}" data-k="${k}" aria-pressed="${k===current}">${LABEL[k]}</button>`).join('');
 function renderNote(){
   const m=MODELS[current];
   document.getElementById('modelNote').innerHTML=
@@ -881,7 +894,10 @@ function renderNote(){
 gridEl.addEventListener('click',e=>{
   const c=e.target.closest('.chip'); if(!c) return;
   current=c.dataset.k;
-  [...gridEl.children].forEach(x=>x.classList.toggle('on',x===c));
+  [...gridEl.children].forEach(x=>{
+    x.classList.toggle('on',x===c);
+    x.setAttribute('aria-pressed',String(x===c));
+  });
   renderNote();
 });
 
@@ -895,11 +911,38 @@ function staleRow(){
     <span class="val">${NP}회</span>
     <span class="verdict badge warn">현재 ${N}회</span></div>`;
 }
+const sheetEl=document.getElementById('sheetEl');
+let sheetOpener=null;                       // 닫을 때 포커스를 돌려줄 곳
 function showSheet(html){
-  document.getElementById('sheetBody').innerHTML=html;
-  document.getElementById('sheetBody').scrollTop=0;
+  sheetOpener=document.activeElement;
+  const body=document.getElementById('sheetBody');
+  body.innerHTML=html;
+  body.scrollTop=0;
+  // aria-labelledby가 가리킬 제목. 어떤 내용을 넣든 .sheet-title 하나를 제목으로 삼는다.
+  const t=body.querySelector('.sheet-title'); if(t) t.id='sheetTitle';
   sheetWrap.classList.add('open');
+  document.body.style.overflow='hidden';    // 시트 뒤 본문이 같이 스크롤되지 않도록
+  sheetEl.focus();
 }
+function closeSheet(){
+  if(!sheetWrap.classList.contains('open')) return;
+  sheetWrap.classList.remove('open');
+  document.body.style.overflow='';
+  if(sheetOpener && sheetOpener.focus) sheetOpener.focus();
+  sheetOpener=null;
+}
+const FOCUSABLE='a[href],button:not([disabled]),summary,input,select,textarea,[tabindex]:not([tabindex="-1"])';
+document.addEventListener('keydown',e=>{
+  if(!sheetWrap.classList.contains('open')) return;
+  if(e.key==='Escape'){ e.preventDefault(); closeSheet(); return; }
+  if(e.key!=='Tab') return;
+  // 모달이므로 탭 순서가 시트 밖으로 새어나가지 않게 가둔다
+  const f=[...sheetEl.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetParent!==null);
+  if(!f.length){ e.preventDefault(); return; }
+  const first=f[0], last=f[f.length-1], a=document.activeElement;
+  if(e.shiftKey && (a===first||a===sheetEl)){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && a===last){ e.preventDefault(); first.focus(); }
+});
 function openSheet(){
   const m=MODELS[current];
   showSheet(`
@@ -914,18 +957,22 @@ function openSheet(){
     <div class="brief-block"><div class="brief-k">해석</div><div class="brief-v">${m.note}</div></div>`);
 }
 sheetWrap.addEventListener('click',e=>{
-  if(e.target.dataset.close) sheetWrap.classList.remove('open');
+  if(e.target.dataset.close) closeSheet();
 });
 
 /* ---- 번호 선택판 (m6) ---- */
 const numGrid=document.getElementById('numGrid');
-numGrid.innerHTML=Array.from({length:45},(_,i)=>`<button class="num-btn" data-n="${i+1}">${i+1}</button>`).join('');
+numGrid.innerHTML=Array.from({length:45},(_,i)=>
+  `<button class="num-btn" data-n="${i+1}" aria-pressed="false" aria-label="${i+1}번">${i+1}</button>`).join('');
 function refreshGrid(){
   document.getElementById('pickedCount').textContent=picked.size;
   [...numGrid.children].forEach(b=>{
     const n=+b.dataset.n, on=picked.has(n);
     b.classList.toggle('picked',on);
-    b.classList.toggle('disabled',!on&&picked.size>=5);
+    b.setAttribute('aria-pressed',String(on));
+    const off=!on&&picked.size>=5;
+    b.classList.toggle('disabled',off);
+    b.setAttribute('aria-disabled',String(off));
     b.style.background=on?GC[groupOf(n)]:'';
     b.style.color=on?GT[groupOf(n)]:'';
   });
@@ -941,11 +988,15 @@ refreshGrid();
 
 /* ---- 게임 수 세그먼트 ---- */
 const segEl=document.getElementById('gameSeg');
-segEl.innerHTML=[1,3,5,7,10].map(v=>`<button data-v="${v}" class="${v===gameCount?'on':''}">${v}</button>`).join('');
+segEl.innerHTML=[1,3,5,7,10].map(v=>
+  `<button data-v="${v}" class="${v===gameCount?'on':''}" aria-pressed="${v===gameCount}" aria-label="${v}게임">${v}</button>`).join('');
 segEl.addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
   gameCount=+b.dataset.v;
-  [...segEl.children].forEach(x=>x.classList.toggle('on',x===b));
+  [...segEl.children].forEach(x=>{
+    x.classList.toggle('on',x===b);
+    x.setAttribute('aria-pressed',String(x===b));
+  });
   document.getElementById('genLabel').textContent=`${gameCount}게임 뽑기`;
 });
 
@@ -1052,6 +1103,7 @@ function renderResults(games,m,k){
   el.innerHTML=head+rows+tools;
   revealDraw(el,'results',()=>{
     const t=el.querySelector('.result-tools'); if(t) t.classList.add('show');
+    document.getElementById('srStatus').textContent=`${k}게임을 뽑았습니다. 결과는 아래 목록에 있습니다.`;
   });
   el.querySelector('[data-act="copy"]').addEventListener('click',e=>{
     const txt=games.map((g,i)=>`${TAGS[i]}  ${g.join(', ')}`).join('\n');
@@ -1244,7 +1296,7 @@ function openInstallGuide(){
       document.getElementById('igMsg').textContent='추가를 취소하셨어요. 아래 안내를 따라 직접 추가하실 수도 있습니다.';
       now.disabled=true; now.style.opacity='.5';
     } else {
-      sheetWrap.classList.remove('open');
+      closeSheet();
     }
   });
 }
