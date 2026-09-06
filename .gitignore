@@ -3,3 +3,16 @@ Thumbs.db
 node_modules/
 .vercel
 *.log
+
+# --- Android (TWA) ---
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+android/*.apk
+android/*.aab
+android/*.idsig
+# 서명 키는 절대 커밋하지 않습니다. ~/.keystores/ 에 보관합니다.
+*.jks
+*.keystore
