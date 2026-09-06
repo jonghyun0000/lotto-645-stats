@@ -7,6 +7,7 @@
   <meta name="description" content="동행복권 로또 6/45 역대 당첨 결과 통계와 번호 뽑기. 완전 오프라인 동작, 개인정보 미수집.">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#F2F4F6">
+  <meta name="color-scheme" content="light">
   <link rel="icon" href="icons/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -27,6 +28,7 @@
     --b1:#FBC400; --b1-t:#3B2F00; --b2:#69C8F2; --b2-t:#083B52;
     --b3:#FF7272; --b3-t:#4C0A0A; --b4:#AAAAAA; --b4-t:#1E1E1E;
     --b5:#B0D840; --b5-t:#243500;
+    --gold:#A87C00;
     --font:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
     --num:"SF Mono","Roboto Mono",Consolas,monospace;
   }
@@ -53,13 +55,13 @@
   .round-line .no{font-size:20px;font-weight:800}
   .round-line .no b{color:var(--blue)}
   .date{font-size:12px;color:var(--dim);margin-bottom:16px}
-  .ball-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+  .ball-row{display:flex;align-items:center;gap:clamp(4px,1.6vw,7px);flex-wrap:wrap;margin-bottom:16px}
   .ball{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-family:var(--num);font-weight:700;font-size:14.5px;flex:none;
     box-shadow:inset 0 -3px 5px rgba(0,0,0,.12),inset 0 2px 3px rgba(255,255,255,.5)}
-  .ball.sm{width:36px;height:36px;font-size:13px}
+  /* 당첨 볼 7개(6+보너스)와 + 기호가 375px 카드 안에 한 줄로 들어가도록 축소 */
+  .ball-row .ball{width:clamp(34px,9vw,40px);height:clamp(34px,9vw,40px);font-size:clamp(12.5px,3.4vw,14.5px)}
   .ball.xs{width:24px;height:24px;font-size:10.5px}
-  .ball.lg{width:40px;height:40px;font-size:14.5px}
   .plus-sep{color:var(--dim);font-size:17px;font-weight:300}
   .g1{background:var(--b1);color:var(--b1-t)} .g2{background:var(--b2);color:var(--b2-t)}
   .g3{background:var(--b3);color:var(--b3-t)} .g4{background:var(--b4);color:var(--b4-t)}
@@ -68,8 +70,9 @@
   .ball.settle{animation:settle .32s cubic-bezier(.34,1.56,.64,1)}
   @keyframes settle{0%{transform:scale(.6);opacity:.4}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
 
-  .prize-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .prize-cell{background:var(--inner);border-radius:14px;padding:12px 12px}
+  .prize-strip{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .prize-cell{background:var(--inner);border-radius:14px;padding:12px 12px;min-width:0}
+  .prize-cell:first-child{grid-column:1/-1}
   .prize-label{font-size:10.5px;color:var(--dim);margin-bottom:4px}
   .prize-value{font-family:var(--num);font-size:14px;font-weight:700;color:var(--txt);word-break:keep-all}
   .prize-value.plain{color:var(--sub)}
@@ -131,7 +134,6 @@
   .btn-ghost{flex:1;background:var(--inner);border:none;color:var(--sub);border-radius:12px;
     padding:12px 10px;font-size:12.5px;font-weight:600;transition:.13s}
   .btn-ghost:active{background:var(--line)}
-  .empty-note{display:none}
   .drawing .result-row{outline:1.5px solid var(--blue-bg)}
 
   .backtest{background:var(--inner);border-radius:14px;padding:16px;margin-top:10px}
@@ -158,7 +160,6 @@
   .freq-bar-wrap:hover .freq-tip{opacity:1}
   .freq-axis{display:flex;gap:2px;margin-bottom:14px}
   .freq-axis span{flex:1;text-align:center;font-family:var(--num);font-size:8px;color:var(--dim)}
-  .freq-legend{display:none}
   .cols2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
   .rank-panel{background:var(--inner);border-radius:14px;padding:14px}
   .rank-panel h4{font-size:11.5px;color:var(--sub);font-weight:700;margin-bottom:10px}
@@ -298,7 +299,10 @@ const draws = RAW.map(r=>({no:r[0],nums:r[1],bonus:r[2],date:r[3],prize1:r[4],wi
                  .sort((a,b)=>a.no-b.no);
 const latest = draws[draws.length-1];
 const N = draws.length;
-const counts = P.counts, lastGap = P.lastGap, pair = P.pair, succ = P.succ;
+const counts = P.counts, pair = P.pair, succ = P.succ;
+// N은 RAW의 실제 회차수, NP는 사전계산 통계(P)가 산출된 기준 회차수.
+// P를 재생성하지 않고 RAW만 갱신하면 두 값이 갈라지므로 검정 근거 문구에는 NP를 쓴다.
+const NP = P.nDraws;
 
 const groupOf = n => n<=10?1:n<=20?2:n<=30?3:n<=40?4:5;
 const GC = ['','var(--b1)','var(--b2)','var(--b3)','var(--b4)','var(--b5)'];
@@ -306,13 +310,16 @@ const GT = ['','var(--b1-t)','var(--b2-t)','var(--b3-t)','var(--b4-t)','var(--b5
 const fmtWon = v => Number(v).toLocaleString('ko-KR')+'원';
 const fmtEok = v => (v/1e8).toFixed(1)+'억원';
 const ballHTML = (n,sz) => `<div class="ball${sz?' '+sz:''} g${groupOf(n)}" data-n="${n}">${n}</div>`;
+// "YYYY-MM-DD"를 new Date()에 그대로 넣으면 UTC 자정으로 해석돼
+// UTC보다 뒤진 표준시 지역에서 날짜와 요일이 하루 밀린다. 로컬 자정으로 만든다.
+const parseDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ===================== 대시보드 ===================== */
 document.getElementById('dataRange').textContent = `${draws[0].no}회 ~ ${latest.no}회 · 총 ${N}회차`;
 document.getElementById('latestNo').textContent = latest.no;
 document.getElementById('latestDate').textContent =
-  new Date(latest.date).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'})+' 추첨';
+  parseDate(latest.date).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'})+' 추첨';
 document.getElementById('footRound').textContent = latest.no;
 document.getElementById('latestBalls').innerHTML =
   latest.nums.map(n=>ballHTML(n)).join('')+'<span class="plus-sep">+</span>'+ballHTML(latest.bonus);
@@ -392,13 +399,13 @@ const MODELS = {
     assume:'추첨은 완전 무작위이며, 과거 번호는 미래 번호에 대해 정보량이 0이다.',
     logic:`그렇다면 과거 데이터를 쓸 곳은 <b>당첨 확률</b>이 아니라 <b>당첨 시 받는 금액</b>뿐입니다.
       로또는 같은 번호를 맞힌 사람끼리 상금을 나누는 구조이므로, 사람들이 잘 고르지 않는 조합을 고르면
-      확률은 그대로여도 받는 돈이 늘어납니다. 1232회 회귀분석 결과, 당첨번호에 12 이하가 많이 포함된 회차일수록
+      확률은 그대로여도 받는 돈이 늘어납니다. ${NP}회 회귀분석 결과, 당첨번호에 12 이하가 많이 포함된 회차일수록
       1등 당첨자 수가 유의하게 많았습니다. 전·후반부에서 모두 재현되었고 순열검정도 통과한 유일한 항목입니다.`,
     algo:'12 이하 번호를 완전히 배제한 33개 풀에서 균등 무작위 추출',
     evidence:[
-      ['회귀계수 (12 이하 개수)','+0.387','ok','유의'],
-      ['전반부 재현','t = +2.14','ok','재현'],
-      ['후반부 재현','t = +4.48','ok','재현'],
+      ['회귀계수 (12 이하 개수)',`+${P.m1.coef}`,'ok','유의'],
+      ['전반부 재현',`t = +${P.m1.tHalf1}`,'ok','재현'],
+      ['후반부 재현',`t = +${P.m1.tHalf2}`,'ok','재현'],
       ['순열검정 p값','p < 0.001','ok','유의'],
       ['기각된 가설: 생일(≤31) 편향','p = 0.90','no','기각'],
       ['기각된 가설: OMR 격자 패턴','p = 0.08','no','기각'],
@@ -529,7 +536,7 @@ const MODELS = {
       "적어도 하나가 3등" 확률은 정확히 게임 수 × 1/34,660이 됩니다. 이것이 도달 가능한 <b>상한</b>입니다.
       그래서 이 모델이 실제로 하는 일은 두 가지입니다. 첫째, 게임 간 번호 중복을 3개 이하로 묶어 상한에
       정확히 도달시킵니다. 둘째, 3등 <b>당첨금</b>을 최적화합니다. 3등도 당첨자끼리 나누는 구조이고,
-      1232회 데이터에서 12 이하 번호가 많이 포함된 회차일수록 3등 당첨자가 뚜렷하게 많았습니다.
+      ${NP}회 데이터에서 12 이하 번호가 많이 포함된 회차일수록 3등 당첨자가 뚜렷하게 많았습니다.
       회당 3등 당첨자가 약 2,600명이라 1등(약 11명)보다 표본이 훨씬 커서, 이 프로젝트에서 가장 강한 신호입니다.`,
     algo:'12 이하 번호를 배제한 33개 풀에서, 게임 간 번호 중복이 3개를 넘지 않도록 포트폴리오 구성',
     evidence:[
@@ -658,7 +665,7 @@ const MODELS = {
       ['지금까지 소진된 조합',`${N}개 (${(N/8145060*100).toFixed(5)}%)`,'ok','–'],
       ['역대 중복 출현 조합','0건','ok','–']
     ],
-    note:`${N}회 동안 같은 조합이 두 번 나온 적은 한 번도 없습니다. 전체 조합의 0.015%만 소진된 상태입니다.`,
+    note:`${N}회 동안 같은 조합이 두 번 나온 적은 한 번도 없습니다. 전체 조합의 ${(N/8145060*100).toFixed(3)}%만 소진된 상태입니다.`,
     gen(){ return uniform(6).sort((a,b)=>a-b); },
     meta(g){ return `합계 ${g.reduce((a,b)=>a+b,0)}`; }
   }
@@ -670,11 +677,11 @@ MODELS.m9 = {
   title:'추천 · 통합 최적',
   short:'검증에서 살아남은 두 효과만 결합한 기본 추천',
   badge:['ok','전수 검증'],
-  assume:'확률을 바꿀 수 있다고 주장하지 않습니다. 1234회 전체 검정에서 살아남은 두 효과 — 겹치지 않는 배치와 비인기 번호 — 만 결합합니다.',
+  assume:`확률을 바꿀 수 있다고 주장하지 않습니다. ${NP}회 전체 검정에서 살아남은 두 효과 — 겹치지 않는 배치와 비인기 번호 — 만 결합합니다.`,
   logic:`이 프로젝트의 모든 검정에서 살아남은 결론은 두 가지뿐입니다.
     첫째, 게임끼리 번호가 겹치지 않으면 "적어도 하나 당첨" 확률이 올라갑니다(5게임 기준 +5.2%, 8,145,060개 조합 전수 확인).
     둘째, 사람들이 과도하게 선택하는 번호(1~12, 끝자리 7)를 피하면 당첨 시 나눠 갖는 인원이 줄어
-    수령액이 늘어납니다(3등 기준 x1.088, 1234회 회귀 p=1.2e-08, 전후반 재현, 미래 예측력 검증).
+    수령액이 늘어납니다(3등 기준 x1.088, ${NP}회 회귀 p=${P.m5.p}, 전후반 재현, 미래 예측력 검증).
     이 모델은 인기 번호를 뺀 30개 풀을 겹치지 않게 배치해 두 효과를 동시에 적용합니다.
     6게임 이상에서는 남은 인기 번호를 소수의 "수거 티켓"에 몰아넣는데, 수령액 배수가 볼록 함수라
     고르게 나누는 것보다 몰아넣는 쪽이 총 기대수령액이 높기 때문입니다.`,
@@ -691,7 +698,10 @@ MODELS.m9 = {
   note:'당첨 확률 자체는 어떤 조합이든 동일합니다. 이 모델이 올리는 것은 여러 게임 구매 시 하위 등수 확률과 당첨 시 실수령액뿐이며, 기댓값은 여전히 마이너스입니다.',
   portfolio(k){
     const CLEAN=[]; for(let n=13;n<=45;n++) if(n!==17&&n!==27&&n!==37) CLEAN.push(n);
-    const SAC=[1,2,3,4,6,8,9,10,12,17,27,37];
+    // 배제 번호는 15개(1~12 + 17,27,37)인데 수거 티켓은 2장 = 12칸이다.
+    // 목록을 손으로 적으면 남는 3개가 영구히 생성되지 않으므로, CLEAN의 여집합을
+    // 매번 섞어서 12개를 뽑는다. 어떤 3개가 빠지는지는 추첨마다 달라진다.
+    const SAC=[]; for(let n=1;n<=45;n++) if(CLEAN.indexOf(n)<0) SAC.push(n);
     const sh=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;};
     const out=[];
     let c=sh(CLEAN);
@@ -710,7 +720,7 @@ MODELS.m9 = {
   summary(k){
     const d=P.m8.disjoint[String(k)];
     const ap = k>=8 ? ' (근사)' : '';
-    return `5등 이상 ${(d*100).toFixed(3)}%${ap} · 3등 당첨금 x1.088 · 1234회 검증 완료`;
+    return `5등 이상 ${(d*100).toFixed(3)}%${ap} · 3등 당첨금 x1.088 · ${NP}회 검증 완료`;
   },
   meta(g){ return g.some(n=>n<=12||n%10===7) ? '수거 티켓' : '클린 x1.088'; }
 };
@@ -856,12 +866,35 @@ function backtestHTML(b){
   </div>`;
 }
 
+/* ---- 클립보드 (비보안 컨텍스트 폴백 포함) ---- */
+// navigator.clipboard는 HTTPS/localhost에서만 존재한다. file://이나 사내 http://로 열면
+// undefined라서 .writeText 접근 자체가 동기 TypeError를 낸다.
+function copyText(txt){
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(txt).then(()=>true,()=>legacyCopy(txt));
+  }
+  return Promise.resolve(legacyCopy(txt));
+}
+function legacyCopy(txt){
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=txt;
+    ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0,txt.length);
+    const ok=document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){ return false; }
+}
+
 /* ---- 결과 렌더 ---- */
 function renderResults(games,m,k){
   const head=m.summary?`<div class="port-summary">${m.summary(k)}</div>`:'';
   const rows=games.map((g,i)=>
     `<div class="result-row"><span class="result-tag">${TAGS[i]}</span>
-     <div class="result-balls">${g.map(n=>ballHTML(n,'lg')).join('')}</div>
+     <div class="result-balls">${g.map(n=>ballHTML(n)).join('')}</div>
      <div class="result-meta">${m.meta(g)}</div></div>`).join('');
   const tools=`<div class="result-tools">
       <button class="btn-ghost" data-act="copy">번호 복사</button>
@@ -875,9 +908,10 @@ function renderResults(games,m,k){
   });
   el.querySelector('[data-act="copy"]').addEventListener('click',e=>{
     const txt=games.map((g,i)=>`${TAGS[i]}  ${g.join(', ')}`).join('\n');
-    navigator.clipboard.writeText(txt).then(()=>{
-      e.target.textContent='복사 완료'; setTimeout(()=>e.target.textContent='번호 복사',1500);
-    }).catch(()=>{ e.target.textContent='복사 실패'; setTimeout(()=>e.target.textContent='번호 복사',1500); });
+    const btn=e.target;
+    const done=ok=>{ btn.textContent=ok?'복사 완료':'복사 실패';
+                     setTimeout(()=>btn.textContent='번호 복사',1500); };
+    copyText(txt).then(done);
   });
   el.querySelector('[data-act="bt"]').addEventListener('click',e=>{
     const slot=el.querySelector('[data-slot="bt"]');
