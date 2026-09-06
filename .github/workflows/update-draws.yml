@@ -1,0 +1,46 @@
+name: 로또 회차 갱신
+
+# 추첨은 매주 토요일 20:45(KST)이고 결과는 그 직후 공개된다.
+# 일요일 01:00 KST에 한 번 받고, 사이트 점검 등으로 실패했을 때를 대비해
+# 일요일 09:00 KST에 한 번 더 시도한다. 스크립트는 새 회차가 없으면
+# 아무것도 하지 않고 끝나므로 중복 실행이 안전하다.
+on:
+  schedule:
+    - cron: '0 16 * * 6'   # 토 16:00 UTC = 일 01:00 KST
+    - cron: '0 0 * * 0'    # 일 00:00 UTC = 일 09:00 KST
+  workflow_dispatch:        # 수동 실행
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-draws
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 검증에 실패하면 스크립트가 종료 코드 1로 끝나고 파일을 건드리지 않는다.
+      # 추첨 결과는 지어낼 수 없는 값이라, 의심스러우면 반영하지 않고 실패시키는 쪽이 옳다.
+      - name: 새 회차 받아오기
+        run: node tools/update-draws.mjs
+
+      - name: 변경분 커밋
+        run: |
+          if git diff --quiet; then
+            echo "새 회차가 없어 커밋할 것이 없습니다."
+            exit 0
+          fi
+          LAST=$(node -e "const s=require('fs').readFileSync('index.html','utf8');const R=JSON.parse(s.match(/^const RAW=(\[.*\]);\$/m)[1]);console.log(R[R.length-1][0])")
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html sw.js
+          git commit -m "데이터 갱신: ${LAST}회차까지 반영"
+          git push
