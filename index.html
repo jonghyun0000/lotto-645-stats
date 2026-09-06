@@ -886,10 +886,10 @@ MODELS.m9 = {
   },
   summary(k){
     // 도달 확률은 이 묶음 구조에 대해 8,145,060개 추첨결과를 전수 계산한 값이다.
-    const p=P.m9.reach[String(k)], full=P.m8.disjoint[String(k)];
-    const cost = k>P.m9.maxDisjoint
-      ? ` · 45개 완전분리 대비 ${(((p/full)-1)*100).toFixed(1)}%`
-      : ' · 완전분리 달성';
+    // 비교 기준은 근거표와 같이 "그냥 무작위로 사는 경우"로 맞춘다.
+    // 완전분리는 이상적 상한이라 사용자가 실제로 견줄 대상이 아니다.
+    const p=P.m9.reach[String(k)], rnd=P.m8.random[String(k)];
+    const cost = rnd ? ` · 무작위 구매 대비 ${(((p/rnd)-1)*100).toFixed(1)}%` : '';
     return `5등 이상 ${(p*100).toFixed(3)}%${cost} · 수령액 x${P.m9.mult}`;
   },
   meta(g){ return `비인기 ${P.m9.poolSize} · x${P.m9.mult}`; }
