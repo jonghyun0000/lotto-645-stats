@@ -465,7 +465,10 @@ console.log('회수율  ' + ret.base + '%  →  배수 적용 ' + ret.boost + '%
 
 // ---------- P 조립 ----------
 // m8은 C(45,6) 전수 계산에서 나오는 상수라 회차와 무관하다. 기존 값을 그대로 옮긴다.
-const oldP = JSON.parse(html.match(/^const P=(\{.*\});$/m)[1]);
+const P_LINE = /^const P=(\{.*\});$/m;
+const pMatch = html.match(P_LINE);
+if (!pMatch) die('index.html에서 P 줄을 찾지 못했습니다.');
+const oldP = JSON.parse(pMatch[1]);
 const P = {
   nDraws: lastNo,
   m1: { table: m1.table, gm: m1.gm, overall: m1.overall, coef: m1.coef,
@@ -482,7 +485,13 @@ const P = {
 console.log('\n' + JSON.stringify(P, null, 1).split('\n').slice(0, 4).join('\n') + ' ...');
 if (DRY) { console.log('\n--dry-run: 파일을 변경하지 않았습니다.'); process.exit(0); }
 
-const out = html.replace(/^const P=\{.*\};$/m, 'const P=' + JSON.stringify(P) + ';');
-if (out === html) die('index.html의 P를 교체하지 못했습니다.');
+// 치환 문자열 안의 $&, $1 같은 패턴이 해석되지 않도록 함수로 넘긴다
+const out = html.replace(P_LINE, () => 'const P=' + JSON.stringify(P) + ';');
+// 시드를 고정했으므로 데이터가 같으면 P도 바이트 단위로 같다.
+// 워크플로의 재시도 실행처럼 새 회차가 없을 때가 이 경우이며, 실패가 아니다.
+if (out === html) {
+  console.log(`\n✓ P 변경 없음 (nDraws ${lastNo}, 이미 최신)`);
+  process.exit(0);
+}
 writeFileSync(HTML, out);
 console.log(`\n✓ P 갱신 (nDraws ${oldP.nDraws} → ${lastNo})`);
