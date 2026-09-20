@@ -13,6 +13,8 @@ const HTML = 'index.html';
 const SW = 'sw.js';
 const LOOKAHEAD = 12;          // 오래 방치돼도 한 번에 따라잡을 수 있도록
 const DRY = process.argv.includes('--dry-run');
+const FETCH_ATTEMPTS = 4;
+const FETCH_TIMEOUT_MS = 30_000;
 
 const API = 'https://www.dhlottery.co.kr/lt645/selectPstLt645Info.do';
 const HEADERS = {
@@ -23,6 +25,36 @@ const HEADERS = {
 };
 
 const die = m => { console.error('✗ ' + m); process.exit(1); };
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// 동행복권 서버는 간헐적으로 연결을 늦게 받거나 끊는다. 한 번의 일시적인
+// 네트워크 오류 때문에 주간 갱신 전체가 실패하지 않도록 충분한 간격을 두고
+// 다시 시도하되, 잘못된 응답을 정상으로 취급하지는 않는다.
+const fetchJson = async url => {
+  let lastError;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: HEADERS,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) throw new Error(`API 응답 ${res.status}`);
+
+      const text = await res.text();
+      if (!text.trim().startsWith('{')) {
+        throw new Error('JSON이 아닌 응답을 받았습니다. 봇 차단이나 점검일 수 있습니다.');
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      lastError = error;
+      const cause = error?.cause?.code ? ` (${error.cause.code})` : '';
+      console.warn(`조회 시도 ${attempt}/${FETCH_ATTEMPTS} 실패: ${error.message}${cause}`);
+      if (attempt < FETCH_ATTEMPTS) await sleep(attempt * 10_000);
+    }
+  }
+  throw lastError;
+};
 
 // ---------- 현재 데이터 읽기 ----------
 const html = readFileSync(HTML, 'utf8');
@@ -36,13 +68,10 @@ console.log(`현재 데이터: 1회 ~ ${last}회 (${RAW.length}회차)`);
 const url = `${API}?srchStrLtEpsd=${last + 1}&srchEndLtEpsd=${last + LOOKAHEAD}`;
 let json;
 try {
-  const res = await fetch(url, { headers: HEADERS, redirect: 'follow' });
-  if (!res.ok) die(`API 응답 ${res.status}`);
-  const text = await res.text();
-  if (!text.trim().startsWith('{')) die('JSON이 아닌 응답을 받았습니다. 봇 차단이나 점검일 수 있습니다.');
-  json = JSON.parse(text);
+  json = await fetchJson(url);
 } catch (e) {
-  die('조회 실패: ' + e.message);
+  const cause = e?.cause?.code ? ` (${e.cause.code})` : '';
+  die(`모든 조회 시도 실패: ${e.message}${cause}`);
 }
 
 const list = json?.data?.list ?? [];
